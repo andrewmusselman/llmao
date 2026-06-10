@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# Hayward — generated, runtime, and local-only files
+# ---------------------------------------------------------------------------
+
+# Runtime state written by the app (StateStore) and its atomic-write temp files.
+# Default path is ./hayward-state.json; HAYWARD_STATE_PATH may point elsewhere.
+hayward-state.json
+demo-state.json
+*-state.json
+*.tmp
+
+# Local secrets / environment overrides (commit .env.example, never .env)
+.env
+.env.*
+!.env.example
+
+# Generated litellm proxy config. The repo ships a committed reference copy;
+# uncomment if you'd rather treat it as build output only.
+# litellm/config.yaml
+
+# Uploaded-file scratch / screenshot output, if produced locally
+/uploads/
+/shots/
+/screenshots/
+*.png.tmp
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+
+# Test / coverage / type-checker caches
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

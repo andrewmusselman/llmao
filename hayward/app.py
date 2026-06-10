@@ -1,0 +1,215 @@
+"""Hayward gateway — app factory and routes.
+
+Routes:
+  GET  /                      portal (login state, model picker, prompt box)
+  GET  /healthz               liveness
+  GET  /auth/dev/login        dev-stub login form (dev mode only)
+  POST /auth/dev/login        establish a dev session
+  GET  /auth/logout           clear session
+  GET  /v1/models             catalog (OpenAI-ish shape + governance metadata)
+  POST /v1/chat/completions   OpenAI-compatible chat, metered per PMC
+  GET  /v1/projects/<p>/usage per-project activity (PMC admins only)
+  GET  /v1/projects/<p>/budget team budget + spend
+
+In asf mode the app is built via asfquart.construct() so it inherits the
+OAuth gateway at /auth, JWT/PAT support, and LDAP-backed sessions. In dev
+mode it's a plain Quart app with a stub login. Routes are identical.
+"""
+from __future__ import annotations
+
+import time
+from typing import Optional
+
+from quart import Quart, jsonify, redirect, request, Response
+
+from . import catalog
+from .auth import current_identity, dev_login, dev_logout
+from .config import Settings, settings as default_settings
+from .litellm_client import BudgetExceeded, make_backend
+from .seam import AuthzError, CatalogError, Identity, Seam
+from .store import StateStore
+from .portal import render_portal, render_dev_login
+
+
+def create_app(settings: Optional[Settings] = None) -> Quart:
+    s = settings or default_settings
+    store = StateStore(s.state_path)
+    backend = make_backend(s, store)
+    seam = Seam(s, backend)
+
+    if s.is_dev_auth:
+        app = Quart(__name__)
+        app.secret_key = s.app_secret
+    else:
+        # Production: inherit OAuth gateway (/auth), PAT support, LDAP sessions.
+        import asfquart
+        from .auth import make_token_handler
+        app = asfquart.construct("hayward", oauth=True, force_login=False)
+        app.token_handler = make_token_handler(s)
+
+    app.config["MAX_CONTENT_LENGTH"] = s.max_upload_bytes
+    app.config["HAYWARD_SETTINGS"] = s
+    app.config["HAYWARD_SEAM"] = seam
+
+    # -- helpers ----------------------------------------------------------
+
+    async def _identity() -> Optional[Identity]:
+        return await current_identity(s)
+
+    def _err(status: int, message: str) -> Response:
+        resp = jsonify({"error": {"message": message, "type": "hayward_error", "code": status}})
+        resp.status_code = status
+        return resp
+
+    # -- portal -----------------------------------------------------------
+
+    @app.route("/")
+    async def index():
+        ident = await _identity()
+        return Response(render_portal(s, ident, catalog.all_models()), content_type="text/html")
+
+    @app.route("/healthz")
+    async def healthz():
+        return jsonify({"status": "ok", "auth_mode": s.auth_mode, "llm_mode": s.litellm_mode})
+
+    # -- dev auth ---------------------------------------------------------
+
+    @app.route("/auth/dev/login", methods=["GET"])
+    async def dev_login_form():
+        if not s.is_dev_auth:
+            return _err(404, "dev login disabled in asf mode")
+        return Response(render_dev_login(), content_type="text/html")
+
+    @app.route("/auth/dev/login", methods=["POST"])
+    async def dev_login_submit():
+        if not s.is_dev_auth:
+            return _err(404, "dev login disabled in asf mode")
+        form = await request.form
+        uid = (form.get("uid") or "").strip()
+        if not uid:
+            return _err(400, "uid required")
+        projects = [p.strip() for p in (form.get("projects") or "").split(",") if p.strip()]
+        committees = [c.strip() for c in (form.get("committees") or "").split(",") if c.strip()]
+        dev_login(uid, projects, committees)
+        return redirect("/")
+
+    @app.route("/auth/logout")
+    async def logout():
+        if s.is_dev_auth:
+            dev_logout()
+        return redirect("/")
+
+    # -- catalog ----------------------------------------------------------
+
+    @app.route("/v1/models")
+    async def list_models():
+        ident = await _identity()
+        if ident is None:
+            return _err(401, "authentication required")
+        data = [
+            {"id": m["id"], "object": "model", "owned_by": m["provider"], "hayward": m}
+            for m in catalog.all_models()
+        ]
+        return jsonify({"object": "list", "data": data})
+
+    # -- chat (OpenAI-compatible) -----------------------------------------
+
+    @app.route("/v1/chat/completions", methods=["POST"])
+    async def chat_completions():
+        ident = await _identity()
+        if ident is None:
+            return _err(401, "authentication required")
+
+        body = await request.get_json(silent=True) or {}
+        model_id = body.get("model")
+        messages = body.get("messages")
+        if not model_id or not isinstance(messages, list) or not messages:
+            return _err(400, "‘model’ and a non-empty ‘messages’ array are required")
+
+        # Which project pays? Header wins; else the body; else the user's only one.
+        project = (
+            request.headers.get("X-Hayward-Project")
+            or body.get("project")
+            or _sole_project(ident)
+        )
+        if not project:
+            return _err(400, "no project specified; set X-Hayward-Project (you are on multiple projects)")
+
+        params = {k: v for k, v in body.items() if k in ("temperature", "top_p", "max_tokens", "stream")}
+        params.pop("stream", None)  # Phase 1 returns non-streamed; streaming is a later toggle.
+
+        try:
+            completion = seam.chat(ident, project, model_id, messages, params)
+        except AuthzError as e:
+            return _err(403, str(e))
+        except CatalogError as e:
+            return _err(404, str(e))
+        except BudgetExceeded as e:
+            return _err(429, f"project budget exceeded: {e}")
+
+        return jsonify({
+            "id": f"haywd-{int(time.time()*1000)}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": model_id,
+            "hayward_project": project,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": completion.content},
+                "finish_reason": "stop",
+            }],
+            "usage": {
+                "prompt_tokens": completion.prompt_tokens,
+                "completion_tokens": completion.completion_tokens,
+                "total_tokens": completion.prompt_tokens + completion.completion_tokens,
+                "cost_usd": completion.cost_usd,
+            },
+        })
+
+    # -- activity + budget ------------------------------------------------
+
+    @app.route("/v1/projects/<project>/usage")
+    async def project_usage(project: str):
+        ident = await _identity()
+        if ident is None:
+            return _err(401, "authentication required")
+        try:
+            rows = seam.project_activity(ident, project)
+        except AuthzError as e:
+            return _err(403, str(e))
+        total = round(sum(r.get("cost_usd", 0.0) for r in rows), 6)
+        return jsonify({"project": project, "entries": rows, "total_cost_usd": total, "count": len(rows)})
+
+    @app.route("/v1/projects/<project>/budget")
+    async def project_budget(project: str):
+        ident = await _identity()
+        if ident is None:
+            return _err(401, "authentication required")
+        if not (ident.is_site_admin or ident.member_of(project)):
+            return _err(403, f"{ident.uid} is not a member of {project}")
+        info = seam.team_status(project)
+        if info is None:
+            return jsonify({"project": project, "provisioned": False})
+        return jsonify({
+            "project": project, "provisioned": True,
+            "max_budget_usd": info.max_budget, "spend_usd": info.spend,
+            "remaining_usd": round(max(0.0, info.max_budget - info.spend), 6),
+        })
+
+    return app
+
+
+def _sole_project(ident: Identity) -> Optional[str]:
+    """If the user belongs to exactly one project, default to it."""
+    all_projects = list(dict.fromkeys([*ident.committees, *ident.projects]))
+    return all_projects[0] if len(all_projects) == 1 else None
+
+
+def main() -> None:
+    s = default_settings
+    app = create_app(s)
+    app.run(host=s.host, port=s.port)
+
+
+if __name__ == "__main__":
+    main()
