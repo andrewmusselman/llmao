@@ -25,7 +25,7 @@ from quart import Quart, jsonify, redirect, request, Response
 from . import catalog
 from .auth import current_identity, dev_login, dev_logout
 from .config import Settings, settings as default_settings
-from .litellm_client import BudgetExceeded, make_backend
+from .litellm_client import BudgetExceeded, BackendUnavailable, make_backend
 from .seam import AuthzError, CatalogError, Identity, Seam
 from .store import StateStore
 from .portal import render_portal, render_dev_login
@@ -60,6 +60,15 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         resp = jsonify({"error": {"message": message, "type": "hayward_error", "code": status}})
         resp.status_code = status
         return resp
+
+    # Any unhandled exception on an API route should still be JSON, never an
+    # HTML error page — the portal parses responses as JSON.
+    @app.errorhandler(500)
+    async def _on_500(exc):
+        from quart import request as _req
+        if _req.path.startswith("/v1/"):
+            return _err(500, "internal error in gateway; check the server log")
+        return exc
 
     # -- portal -----------------------------------------------------------
 
@@ -146,6 +155,8 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
             return _err(404, str(e))
         except BudgetExceeded as e:
             return _err(429, f"project budget exceeded: {e}")
+        except BackendUnavailable as e:
+            return _err(504, str(e))
 
         return jsonify({
             "id": f"haywd-{int(time.time()*1000)}",

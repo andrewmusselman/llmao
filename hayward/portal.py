@@ -314,7 +314,16 @@ async function send(){
       method:'POST', headers:{'Content-Type':'application/json','X-Hayward-Project':project},
       body:JSON.stringify({model, messages:[{role:'user',content:prompt}]}),
     });
-    const j=await r.json();
+    // Parse defensively: a timeout or crash can yield a non-JSON body.
+    let j=null;
+    try { j=await r.json(); }
+    catch(_) {
+      out.className='out err';
+      out.textContent = r.status===504
+        ? 'The model timed out — it may still be generating. Try a smaller/faster model (e.g. gemma3:4b).'
+        : `Gateway returned a non-JSON response (HTTP ${r.status}). Check the server log.`;
+      return;
+    }
     if(!r.ok){ out.className='out err'; out.textContent=(j.error&&j.error.message)||('error '+r.status); }
     else{
       const u=j.usage;

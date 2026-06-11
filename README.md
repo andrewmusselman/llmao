@@ -49,7 +49,7 @@ identity — e.g. uid `jdoe`, projects `airflow, lineage`, PMC `airflow`. Then:
 Run the tests:
 
 ```bash
-make test          # 9 tests: seam, budgets, authz, catalog, HTTP API
+make test          # 10 tests: seam, budgets, authz, catalog, HTTP API
 ```
 
 ---
@@ -92,7 +92,8 @@ GET /v1/projects/<project>/usage
 ```
 
 Errors use standard codes: `401` unauthenticated, `403` not a member / not a
-PMC admin, `404` unknown model, `429` project budget exceeded.
+PMC admin, `404` unknown model, `429` project budget exceeded, `504` the model
+timed out or the proxy was unreachable. Error bodies are always JSON.
 
 ---
 
@@ -118,15 +119,69 @@ export HAYWARD_LITELLM_MODE=proxy     # talk to a real litellm proxy
    make proxy         # litellm --config litellm/config.yaml
    ```
 
-   Set `HAYWARD_SELFHOST_BASE_URL` to your vast.ai vLLM endpoint and the
-   provider keys (`OPENAI_API_KEY`, etc.). Set `HAYWARD_LITELLM_MASTER_KEY` to
-   the same value as the proxy's `master_key`; the seam uses it to provision
-   teams and mint per-team keys.
+   Set the self-host endpoint (e.g. `HAYWARD_OLLAMA_BASE_URL`, or a vast.ai
+   vLLM URL) and any external provider keys (`OPENAI_API_KEY`, etc.). Set
+   `HAYWARD_LITELLM_MASTER_KEY` to the same value as the proxy's `master_key`;
+   the seam uses it to provision teams and mint per-team keys.
 
 3. **Serve** behind hypercorn and point DNS/TLS for `llm.apache.org` at it.
 
 The PAT handler in `auth.py` (`make_token_handler`) is a stub: wire it to your
 token store to let non-interactive CLI/SDK callers authenticate.
+
+### Using a local Ollama as the self-host backend
+
+The self-host catalog entries are wired to a local Ollama via the litellm
+proxy, so you develop against real local models while keeping real per-PMC
+budget enforcement (budgets live in litellm, which Ollama lacks). The seeded
+self-host tier is sized for a 6GB GPU (e.g. GTX 1060):
+
+| Catalog model | Ollama tag | ~Size | Good for |
+|---|---|---|---|
+| Qwen2.5-Coder 7B | `qwen2.5-coder:7b` | 4.7GB | code: write, explain, debug, review |
+| Qwen3.5 4B | `qwen3.5:4b` | 3.4GB | documents / general — **recommended default** |
+| Gemma 3 4B | `gemma3:4b` | 3.3GB | multimodal, RAM-efficient |
+| Qwen3 8B | `qwen3:8b` | 5.2GB | reasoning step-up (at the 6GB edge) |
+| DeepSeek-R1 8B | `deepseek-r1:8b` | 5.2GB | reasoning with visible `<think>` (slower) |
+
+```bash
+ollama pull qwen2.5-coder:7b
+ollama pull qwen3.5:4b
+ollama pull gemma3:4b
+ollama pull qwen3:8b
+ollama pull deepseek-r1:8b
+ollama list
+```
+
+Notes: the 8B models sit right at 6GB and will spill slightly to CPU — usable
+but slower than the 4B picks. DeepSeek-R1 8B is a *distill* (not the 671B R1)
+and emits a `<think>` chain-of-thought before its answer. Gemma 3 has weaker
+tool-calling, fine for Phase 1 chat. Check fit with `ollama run <tag> "hi"`
+then `ollama ps` (the PROCESSOR column shows the GPU/CPU split).
+
+Slow models: the gateway waits `HAYWARD_REQUEST_TIMEOUT_S` (default 600s) for a
+response. A reasoning model on a modest GPU can exceed that; if a call times out
+the portal says so and returns a `504` (it does not hang or show a raw error).
+Prefer a non-reasoning model like `gemma3:4b` for document rewrites to stay well
+under the limit, or raise the timeout for big jobs.
+
+```bash
+export HAYWARD_OLLAMA_BASE_URL=http://localhost:11434
+export HAYWARD_LITELLM_MODE=proxy
+make proxy            # terminal 1: litellm proxy in front of Ollama
+make run              # terminal 2: Hayward
+```
+
+**Adding or changing a model touches two files that must agree:**
+`hayward/catalog.py` (what the portal lists, plus governance metadata) and
+`litellm/config.yaml` (the Ollama route). Each catalog `backend` string must
+equal a config `model_name`. Edit the catalog, set the tag in the
+`OLLAMA_TAGS` map in `scripts/render_litellm_config.py`, then `make config` to
+regenerate the config so they stay in sync.
+
+Notes: Gemma defaults to a 4K context in Ollama, so the generated config sets
+`num_ctx` explicitly; Phase 1's portal upload is text-only, so Gemma's image
+input isn't exercised through the UI yet.
 
 ---
 

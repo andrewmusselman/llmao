@@ -1,36 +1,32 @@
-# litellm proxy configuration for Hayward (production / HAYWARD_LITELLM_MODE=proxy).
-#
-# Run the proxy alongside Hayward:
-#     litellm --config litellm/config.yaml
-#
-# Hayward's seam provisions one litellm *team* per ASF project against this
-# proxy and mints a scoped key per team, so spend and budgets are tracked per
-# PMC natively. The model_name values here MUST match the `backend` field of
-# the entries in hayward/catalog.py.
-#
-# Regenerate this file from the catalog with:
-#     python scripts/render_litellm_config.py > litellm/config.yaml
+# litellm proxy configuration for Hayward — GENERATED from hayward/catalog.py.
+# Edit the catalog, then re-run scripts/render_litellm_config.py.
 
 model_list:
-  # --- self-hosted (your vast.ai vLLM endpoint, OpenAI-compatible) ---
-  - model_name: openai/llama-3.1-8b-instruct
+  - model_name: selfhost/qwen2.5-coder-7b
     litellm_params:
-      model: openai/llama-3.1-8b-instruct
-      api_base: os.environ/HAYWARD_SELFHOST_BASE_URL   # e.g. https://your-vast-ai-host/v1
-      api_key: os.environ/HAYWARD_SELFHOST_API_KEY
-
-  - model_name: openai/mistral-7b-instruct
+      model: ollama_chat/qwen2.5-coder:7b
+      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
+  - model_name: selfhost/qwen3.5-4b
     litellm_params:
-      model: openai/mistral-7b-instruct
-      api_base: os.environ/HAYWARD_SELFHOST_BASE_URL
-      api_key: os.environ/HAYWARD_SELFHOST_API_KEY
-
-  # --- external providers ---
+      model: ollama_chat/qwen3.5:4b
+      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
+  - model_name: selfhost/gemma3-4b
+    litellm_params:
+      model: ollama_chat/gemma3:4b
+      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
+      num_ctx: 32768
+  - model_name: selfhost/qwen3-8b
+    litellm_params:
+      model: ollama_chat/qwen3:8b
+      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
+  - model_name: selfhost/deepseek-r1-8b
+    litellm_params:
+      model: ollama_chat/deepseek-r1:8b
+      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
   - model_name: openai/gpt-4o-mini
     litellm_params:
       model: openai/gpt-4o-mini
       api_key: os.environ/OPENAI_API_KEY
-
   - model_name: anthropic/claude-haiku-4-5
     litellm_params:
       model: anthropic/claude-haiku-4-5
@@ -38,10 +34,7 @@ model_list:
 
 litellm_settings:
   drop_params: true
-  # Enable cost tracking so /team/info reports spend.
   success_callback: ["litellm_spend_logs"]
 
 general_settings:
-  # The master key Hayward uses for the admin endpoints (/team/new, /key/generate).
-  # Set to the same value as HAYWARD_LITELLM_MASTER_KEY.
   master_key: os.environ/HAYWARD_LITELLM_MASTER_KEY

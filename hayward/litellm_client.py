@@ -31,6 +31,10 @@ class BudgetExceeded(Exception):
     """Raised when a team is over budget (mirrors litellm proxy's 4xx)."""
 
 
+class BackendUnavailable(Exception):
+    """Raised when the model backend times out or can't be reached."""
+
+
 @dataclass
 class Completion:
     content: str
@@ -220,11 +224,21 @@ class ProxyBackend:
             raise RuntimeError(f"no litellm team provisioned for {project}")
         base = self._s.litellm_base_url.rstrip("/")
         payload = {"model": model_backend, "messages": messages, **params}
-        resp = self._requests.post(
-            f"{base}/v1/chat/completions", json=payload,
-            headers={"Authorization": f"Bearer {info.key}", "Content-Type": "application/json"},
-            timeout=120,
-        )
+        try:
+            resp = self._requests.post(
+                f"{base}/v1/chat/completions", json=payload,
+                headers={"Authorization": f"Bearer {info.key}", "Content-Type": "application/json"},
+                timeout=self._s.request_timeout_s,
+            )
+        except self._requests.exceptions.Timeout:
+            raise BackendUnavailable(
+                f"the model timed out after {self._s.request_timeout_s}s — it may still be generating; "
+                f"try a smaller/faster model or raise HAYWARD_REQUEST_TIMEOUT_S"
+            )
+        except self._requests.exceptions.ConnectionError:
+            raise BackendUnavailable(
+                f"could not reach the litellm proxy at {base} — is `make proxy` running?"
+            )
         if resp.status_code in (400, 402, 429) and "budget" in resp.text.lower():
             raise BudgetExceeded(resp.text)
         resp.raise_for_status()

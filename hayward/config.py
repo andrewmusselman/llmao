@@ -52,6 +52,11 @@ class Settings:
     # mint per-team keys via the proxy's /team and /key admin endpoints.
     litellm_master_key: str = field(default_factory=lambda: os.getenv("HAYWARD_LITELLM_MASTER_KEY", "sk-hayward-master-dev"))
 
+    # How long (seconds) to wait for a chat completion from the proxy. Local
+    # models on modest GPUs (or reasoning models that think first) can be slow,
+    # so this is generous by default and overridable.
+    request_timeout_s: int = field(default_factory=lambda: int(os.getenv("HAYWARD_REQUEST_TIMEOUT_S", "600")))
+
     # --- Budgets ----------------------------------------------------------
     # Default monthly budget (USD) granted to a PMC team on first provision.
     default_team_budget_usd: float = field(default_factory=lambda: float(os.getenv("HAYWARD_DEFAULT_TEAM_BUDGET_USD", "100")))
