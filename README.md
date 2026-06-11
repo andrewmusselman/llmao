@@ -5,7 +5,12 @@ This is **Phase 1**: ASF identity, per-PMC budgets, a model catalog with
 governance metadata, and manual model selection — text or file in, metered
 response out.
 
-asfquart owns identity and per-PMC authorization. litellm owns the catalog,
+<p align="center">
+  <img src="docs/screenshots/portal.png" width="820"
+       alt="Hayward portal — a metered call billed to a PMC, with model governance metadata, budget, and per-project activity">
+</p>
+
+`asfquart` owns identity and per-PMC authorization. litellm owns the catalog,
 budgets, metering, and the OpenAI-compatible API. The code in this repo is the
 **seam** between them, plus a thin portal.
 
