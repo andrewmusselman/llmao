@@ -171,10 +171,12 @@ Prefer a non-reasoning model like `gemma3:4b` for document rewrites to stay well
 under the limit, or raise the timeout for big jobs.
 
 ```bash
+# terminal 1: litellm proxy in front of Ollama
+make proxy
+# terminal 2: Hayward
 export HAYWARD_OLLAMA_BASE_URL=http://localhost:11434
 export HAYWARD_LITELLM_MODE=proxy
-make proxy            # terminal 1: litellm proxy in front of Ollama
-make run              # terminal 2: Hayward
+make run
 ```
 
 **Adding or changing a model touches two files that must agree:**
