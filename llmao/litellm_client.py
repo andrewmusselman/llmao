@@ -70,10 +70,8 @@ def _est_tokens(text: str) -> int:
 
 # Rough per-1k-token USD pricing so the budget math is non-trivial.
 _MOCK_PRICES = {
-    # Self-hosted models have no per-token API bill, but GPU time isn't free.
-    # These nominal per-1k-token prices let budgets/metering exercise the
-    # self-host path (amortized GPU cost). Tune or zero per policy; the real
-    # cost model for self-host is decided by the advisor layer.
+    # Self-hosted: no per-token API bill, but GPU time isn't free. Nominal
+    # prices keep budget/metering exercisable in tests.
     "selfhost/gemma4-26b": 0.0002,
     "selfhost/qwen3.6-27b": 0.0002,
     "selfhost/qwen3-8b": 0.0001,

@@ -107,6 +107,7 @@ CATALOG: List[CatalogModel] = [
         api_base_env="LLMAO_SELFHOST_QWEN8B_URL",
         notes="Fast lightweight tier for routine/cheap calls.",
     ),
+
 ]
 
 _BY_ID = {m.id: m for m in CATALOG}
