@@ -1,0 +1,114 @@
+# llmao GPU model-host stack.
+#
+# Topology (Option A — one vLLM server per model, litellm routes by name):
+#
+#   Apache vhost (host :443)  ->  llmao (:8080, CPU)
+#                                    |
+#                                 litellm-proxy (:4000, CPU)
+#                    +---------------+---------------+
+#                    |               |               |
+#              vllm-gemma       vllm-qwen-coder   vllm-qwen8b
+#              (:8001, GPU)     (:8002, GPU)      (:8003, GPU)
+#
+# All containers share the llmao-net bridge and resolve each other by name.
+# Only llmao is fronted externally (via the host Apache reverse proxy);
+# litellm and the vLLM servers bind to the internal network only.
+#
+# The three vLLM servers share one L40S (48GB). --gpu-memory-utilization is
+# capped per model so they co-reside. Tune the caps against real VRAM use.
+
+x-vllm-common: &vllm-common
+  image: vllm/vllm-openai:v0.6.6   # pin; never :latest
+  restart: unless-stopped
+  networks: [llmao-net]
+  volumes:
+    - hf-cache:/root/.cache/huggingface
+  environment:
+    - HF_TOKEN=${HF_TOKEN}
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+  ipc: host   # vLLM needs this for its shared-memory tensor ops
+
+services:
+  # --- Gateway (CPU) ---------------------------------------------------
+  llmao:
+    image: llmao:latest          # built from the llmao repo (make build)
+    restart: unless-stopped
+    networks: [llmao-net]
+    ports:
+      - "127.0.0.1:8080:8080"    # loopback only; host Apache vhost fronts it
+    environment:
+      - LLMAO_AUTH_MODE=${LLMAO_AUTH_MODE:-asf}
+      - LLMAO_LITELLM_MODE=proxy
+      - LLMAO_LITELLM_BASE_URL=http://litellm-proxy:4000
+      - LLMAO_LITELLM_MASTER_KEY=${LLMAO_LITELLM_MASTER_KEY}
+      - LLMAO_APP_SECRET=${LLMAO_APP_SECRET}
+    depends_on: [litellm-proxy]
+
+  # --- litellm proxy (CPU) --------------------------------------------
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-stable
+    restart: unless-stopped
+    networks: [llmao-net]
+    command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
+    volumes:
+      - /etc/llmao/litellm-config.yaml:/etc/litellm/config.yaml:ro
+    environment:
+      # Self-host base URLs — one per vLLM server (Option A).
+      - LLMAO_SELFHOST_GEMMA_URL=http://vllm-gemma:8001/v1
+      - LLMAO_SELFHOST_QWEN_CODER_URL=http://vllm-qwen-coder:8002/v1
+      - LLMAO_SELFHOST_QWEN8B_URL=http://vllm-qwen8b:8003/v1
+      - LLMAO_SELFHOST_API_KEY=${LLMAO_SELFHOST_API_KEY:-not-required}
+      # External providers.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK}
+      # Admin master key (team/key provisioning + spend).
+      - LLMAO_LITELLM_MASTER_KEY=${LLMAO_LITELLM_MASTER_KEY}
+    depends_on: [vllm-gemma, vllm-qwen-coder, vllm-qwen8b]
+
+  # --- vLLM: Gemma 4 26B-A4B (general/multimodal/agentic) --------------
+  vllm-gemma:
+    <<: *vllm-common
+    command: >
+      --model google/gemma-4-26b-a4b
+      --served-model-name gemma4-26b
+      --port 8001
+      --gpu-memory-utilization 0.38
+      --max-model-len 32768
+      --quantization fp8
+
+  # --- vLLM: Qwen 3.6-27B (coding) -------------------------------------
+  vllm-qwen-coder:
+    <<: *vllm-common
+    command: >
+      --model Qwen/Qwen3.6-27B
+      --served-model-name qwen3.6-27b
+      --port 8002
+      --gpu-memory-utilization 0.38
+      --max-model-len 32768
+      --quantization fp8
+
+  # --- vLLM: Qwen3-8B (fast) -------------------------------------------
+  vllm-qwen8b:
+    <<: *vllm-common
+    command: >
+      --model Qwen/Qwen3-8B
+      --served-model-name qwen3-8b
+      --port 8003
+      --gpu-memory-utilization 0.18
+      --max-model-len 32768
+      --quantization fp8
+
+networks:
+  llmao-net:
+    name: llmao-net
+    driver: bridge
+
+volumes:
+  hf-cache:
+    name: llmao-hf-cache

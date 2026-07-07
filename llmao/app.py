@@ -1,4 +1,4 @@
-"""Hayward gateway — app factory and routes.
+"""llmao gateway — app factory and routes.
 
 Routes:
   GET  /                      portal (login state, model picker, prompt box)
@@ -44,12 +44,12 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         # Production: inherit OAuth gateway (/auth), PAT support, LDAP sessions.
         import asfquart
         from .auth import make_token_handler
-        app = asfquart.construct("hayward", oauth=True, force_login=False)
+        app = asfquart.construct("llmao", oauth=True, force_login=False)
         app.token_handler = make_token_handler(s)
 
     app.config["MAX_CONTENT_LENGTH"] = s.max_upload_bytes
-    app.config["HAYWARD_SETTINGS"] = s
-    app.config["HAYWARD_SEAM"] = seam
+    app.config["LLMAO_SETTINGS"] = s
+    app.config["LLMAO_SEAM"] = seam
 
     # -- helpers ----------------------------------------------------------
 
@@ -57,7 +57,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         return await current_identity(s)
 
     def _err(status: int, message: str) -> Response:
-        resp = jsonify({"error": {"message": message, "type": "hayward_error", "code": status}})
+        resp = jsonify({"error": {"message": message, "type": "llmao_error", "code": status}})
         resp.status_code = status
         return resp
 
@@ -116,7 +116,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         if ident is None:
             return _err(401, "authentication required")
         data = [
-            {"id": m["id"], "object": "model", "owned_by": m["provider"], "hayward": m}
+            {"id": m["id"], "object": "model", "owned_by": m["provider"], "llmao": m}
             for m in catalog.all_models()
         ]
         return jsonify({"object": "list", "data": data})
@@ -137,12 +137,12 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
 
         # Which project pays? Header wins; else the body; else the user's only one.
         project = (
-            request.headers.get("X-Hayward-Project")
+            request.headers.get("X-LLMAO-Project")
             or body.get("project")
             or _sole_project(ident)
         )
         if not project:
-            return _err(400, "no project specified; set X-Hayward-Project (you are on multiple projects)")
+            return _err(400, "no project specified; set X-LLMAO-Project (you are on multiple projects)")
 
         params = {k: v for k, v in body.items() if k in ("temperature", "top_p", "max_tokens", "stream")}
         params.pop("stream", None)  # Phase 1 returns non-streamed; streaming is a later toggle.
@@ -163,7 +163,7 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
             "object": "chat.completion",
             "created": int(time.time()),
             "model": model_id,
-            "hayward_project": project,
+            "llmao_project": project,
             "choices": [{
                 "index": 0,
                 "message": {"role": "assistant", "content": completion.content},

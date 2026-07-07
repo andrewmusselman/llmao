@@ -14,7 +14,7 @@ Two implementations behind one interface:
   view are exercised end to end.
 
 The seam (seam.py) depends only on this interface, so flipping
-HAYWARD_LITELLM_MODE from "mock" to "proxy" changes nothing upstream.
+LLMAO_LITELLM_MODE from "mock" to "proxy" changes nothing upstream.
 """
 from __future__ import annotations
 
@@ -74,6 +74,7 @@ _MOCK_PRICES = {
     "openai/mistral-7b-instruct": 0.0,
     "openai/gpt-4o-mini": 0.0006,
     "anthropic/claude-haiku-4-5": 0.0010,
+    "anthropic/claude-haiku": 0.0010,
 }
 
 
@@ -185,7 +186,7 @@ class ProxyBackend:
         # 2. Mint a key bound to that team.
         key_resp = self._requests.post(
             f"{base}/key/generate",
-            json={"team_id": team_id, "key_alias": f"hayward-{project}"},
+            json={"team_id": team_id, "key_alias": f"llmao-{project}"},
             headers=self._admin_headers(), timeout=15,
         )
         key_resp.raise_for_status()
@@ -233,7 +234,7 @@ class ProxyBackend:
         except self._requests.exceptions.Timeout:
             raise BackendUnavailable(
                 f"the model timed out after {self._s.request_timeout_s}s — it may still be generating; "
-                f"try a smaller/faster model or raise HAYWARD_REQUEST_TIMEOUT_S"
+                f"try a smaller/faster model or raise LLMAO_REQUEST_TIMEOUT_S"
             )
         except self._requests.exceptions.ConnectionError:
             raise BackendUnavailable(

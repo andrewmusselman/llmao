@@ -1,8 +1,8 @@
-# Hayward — dev workflow. Uses a local virtualenv (.venv) so it works on
+# llmao — dev workflow. Uses a local virtualenv (.venv) so it works on
 # PEP 668 "externally managed" systems (Debian/Ubuntu) without touching the
 # system Python.
 
-.PHONY: install run test config proxy clean
+.PHONY: install run test config proxy build clean
 
 VENV := .venv
 PY   := $(VENV)/bin/python
@@ -19,7 +19,7 @@ $(VENV)/.installed: requirements-dev.txt
 
 # Run the gateway in dev mode (stub auth + mock LLM). No external services.
 run: install
-	$(PY) -m hayward.app
+	$(PY) -m llmao.app
 
 test: install
 	PYTHONPATH=. $(PY) -m pytest tests/ -q
@@ -33,7 +33,13 @@ proxy: install
 	$(PIP) install "litellm[proxy]" >/dev/null
 	$(VENV)/bin/litellm --config litellm/config.yaml
 
+# Build the production Docker image (used by Puppet: `make build`).
+# Regenerates the litellm config from the catalog first so the image ships
+# a config.yaml that matches the catalog.
+build: config
+	docker build -t llmao:latest .
+
 clean:
-	rm -f hayward-state.json demo-state.json *.tmp
+	rm -f llmao-state.json demo-state.json *.tmp
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
 	rm -rf $(VENV)
