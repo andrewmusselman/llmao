@@ -1,10 +1,10 @@
 """Authentication / identity resolution.
 
-In production (HAYWARD_AUTH_MODE=asf) this reads a real asfquart
+In production (LLMAO_AUTH_MODE=asf) this reads a real asfquart
 ``ClientSession`` — populated by oauth.apache.org + LDAP — and also supports
 bearer PATs through asfquart's ``token_handler`` hook. In dev mode it issues a
 stub session from a simple login form so the whole app is runnable with no
-external services. Both paths produce the same :class:`~hayward.seam.Identity`,
+external services. Both paths produce the same :class:`~llmao.seam.Identity`,
 so nothing downstream branches on auth mode.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from .config import Settings
 from .seam import Identity
 
 # Cookie key for the dev-stub session.
-_DEV_SESSION_KEY = "hayward_dev_session"
+_DEV_SESSION_KEY = "llmao_dev_session"
 
 
 # ---------------------------------------------------------------------------

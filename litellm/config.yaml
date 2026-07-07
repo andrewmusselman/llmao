@@ -1,40 +1,34 @@
-# litellm proxy configuration for Hayward — GENERATED from hayward/catalog.py.
+# litellm proxy configuration for llmao — GENERATED from llmao/catalog.py.
 # Edit the catalog, then re-run scripts/render_litellm_config.py.
 
 model_list:
-  - model_name: selfhost/qwen2.5-coder-7b
+  - model_name: selfhost/gemma4-26b
     litellm_params:
-      model: ollama_chat/qwen2.5-coder:7b
-      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
-  - model_name: selfhost/qwen3.5-4b
+      model: openai/gemma4-26b
+      api_base: os.environ/LLMAO_SELFHOST_GEMMA_URL
+      api_key: os.environ/LLMAO_SELFHOST_API_KEY
+  - model_name: selfhost/qwen3.6-27b
     litellm_params:
-      model: ollama_chat/qwen3.5:4b
-      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
-  - model_name: selfhost/gemma3-4b
-    litellm_params:
-      model: ollama_chat/gemma3:4b
-      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
-      num_ctx: 32768
+      model: openai/qwen3.6-27b
+      api_base: os.environ/LLMAO_SELFHOST_QWEN_CODER_URL
+      api_key: os.environ/LLMAO_SELFHOST_API_KEY
   - model_name: selfhost/qwen3-8b
     litellm_params:
-      model: ollama_chat/qwen3:8b
-      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
-  - model_name: selfhost/deepseek-r1-8b
-    litellm_params:
-      model: ollama_chat/deepseek-r1:8b
-      api_base: os.environ/HAYWARD_OLLAMA_BASE_URL
-  - model_name: openai/gpt-4o-mini
-    litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
+      model: openai/qwen3-8b
+      api_base: os.environ/LLMAO_SELFHOST_QWEN8B_URL
+      api_key: os.environ/LLMAO_SELFHOST_API_KEY
   - model_name: anthropic/claude-haiku-4-5
     litellm_params:
       model: anthropic/claude-haiku-4-5
       api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: bedrock/anthropic.claude-sonnet-4-5
+    litellm_params:
+      model: bedrock/anthropic.claude-sonnet-4-5
+      api_key: os.environ/AWS_BEARER_TOKEN_BEDROCK
 
 litellm_settings:
   drop_params: true
   success_callback: ["litellm_spend_logs"]
 
 general_settings:
-  master_key: os.environ/HAYWARD_LITELLM_MASTER_KEY
+  master_key: os.environ/LLMAO_LITELLM_MASTER_KEY

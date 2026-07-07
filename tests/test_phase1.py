@@ -9,11 +9,11 @@ import tempfile
 
 import pytest
 
-from hayward.config import Settings
-from hayward.store import StateStore
-from hayward.litellm_client import MockBackend, BudgetExceeded
-from hayward.seam import Seam, Identity, AuthzError, CatalogError
-from hayward import catalog
+from llmao.config import Settings
+from llmao.store import StateStore
+from llmao.litellm_client import MockBackend, BudgetExceeded
+from llmao.seam import Seam, Identity, AuthzError, CatalogError
+from llmao import catalog
 
 
 def _settings(tmp):
@@ -43,7 +43,7 @@ def test_member_can_call_and_is_metered():
     with tempfile.TemporaryDirectory() as tmp:
         seam, _ = _seam(tmp)
         ident = Identity(uid="jdoe", projects=["airflow"], committees=[])
-        c = seam.chat(ident, "airflow", "openai/gpt-4o-mini", [{"role": "user", "content": "hi there"}])
+        c = seam.chat(ident, "airflow", "anthropic/claude-haiku", [{"role": "user", "content": "hi there"}])
         assert c.content
         assert c.prompt_tokens > 0
         info = seam.team_status("airflow")
@@ -56,7 +56,7 @@ def test_non_member_is_refused():
         seam, _ = _seam(tmp)
         ident = Identity(uid="jdoe", projects=["airflow"], committees=[])
         with pytest.raises(AuthzError):
-            seam.chat(ident, "kafka", "openai/gpt-4o-mini", [{"role": "user", "content": "hi"}])
+            seam.chat(ident, "kafka", "anthropic/claude-haiku", [{"role": "user", "content": "hi"}])
 
 
 def test_unknown_model_is_refused():
@@ -88,7 +88,7 @@ def test_activity_requires_pmc_admin():
         seam, _ = _seam(tmp)
         member = Identity(uid="jdoe", projects=["airflow"], committees=[])
         admin = Identity(uid="chair", projects=[], committees=["airflow"])
-        seam.chat(member, "airflow", "openai/gpt-4o-mini", [{"role": "user", "content": "hi"}])
+        seam.chat(member, "airflow", "anthropic/claude-haiku", [{"role": "user", "content": "hi"}])
         with pytest.raises(AuthzError):
             seam.project_activity(member, "airflow")
         rows = seam.project_activity(admin, "airflow")
@@ -100,7 +100,7 @@ def test_site_admin_sees_any_project():
         seam, _ = _seam(tmp)
         member = Identity(uid="jdoe", projects=["airflow"], committees=[])
         root = Identity(uid="root", projects=[], committees=[], is_site_admin=True)
-        seam.chat(member, "airflow", "openai/gpt-4o-mini", [{"role": "user", "content": "hi"}])
+        seam.chat(member, "airflow", "anthropic/claude-haiku", [{"role": "user", "content": "hi"}])
         rows = seam.project_activity(root, "airflow")
         assert len(rows) == 1
 
@@ -110,7 +110,7 @@ def test_site_admin_sees_any_project():
 def test_http_chat_flow():
     with tempfile.TemporaryDirectory() as tmp:
         s = _settings(tmp)
-        from hayward.app import create_app
+        from llmao.app import create_app
         app = create_app(s)
 
         async def run():
@@ -122,13 +122,13 @@ def test_http_chat_flow():
             assert r.status_code == 200
             # chat
             r = await client.post("/v1/chat/completions", json={
-                "model": "openai/gpt-4o-mini",
+                "model": "anthropic/claude-haiku",
                 "messages": [{"role": "user", "content": "hello"}],
-            }, headers={"X-Hayward-Project": "airflow"})
+            }, headers={"X-LLMAO-Project": "airflow"})
             assert r.status_code == 200, await r.get_data()
             body = await r.get_json()
             assert body["choices"][0]["message"]["content"]
-            assert body["hayward_project"] == "airflow"
+            assert body["llmao_project"] == "airflow"
             # budget reflects the spend
             r = await client.get("/v1/projects/airflow/budget")
             b = await r.get_json()
@@ -140,13 +140,13 @@ def test_http_chat_flow():
 def test_http_requires_auth():
     with tempfile.TemporaryDirectory() as tmp:
         s = _settings(tmp)
-        from hayward.app import create_app
+        from llmao.app import create_app
         app = create_app(s)
 
         async def run():
             client = app.test_client()
             r = await client.post("/v1/chat/completions", json={
-                "model": "openai/gpt-4o-mini",
+                "model": "anthropic/claude-haiku",
                 "messages": [{"role": "user", "content": "hi"}],
             })
             assert r.status_code == 401

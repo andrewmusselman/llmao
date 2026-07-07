@@ -3,7 +3,7 @@
 A single self-contained HTML page (no build step, no external assets) so the
 gateway ships as one process. The visual register is a control panel for an
 ASF infrastructure service: a calm slate field, one restrained green accent
-that stands for "within bounds" (the Hayward / hedge-warden idea), IBM Plex
+that stands for "within bounds," IBM Plex
 Mono for anything that is data or identity, and a quiet sans for prose. The
 signature element is the boundary rule — a hairline that frames the console
 the way a hedge frames a field.
@@ -26,12 +26,12 @@ def render_dev_login() -> str:
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hayward · sign in (dev)</title>
+<title>llmao · sign in (dev)</title>
 {_STYLE}
 </head><body>
 <main class="shell">
   <div class="console">
-    <div class="eyebrow">hayward · dev auth</div>
+    <div class="eyebrow">llmao · dev auth</div>
     <h1>Stand in as an ASF identity</h1>
     <p class="lede">No external calls in dev mode. Enter a uid and the projects it belongs to;
     PMC memberships grant admin (the activity view) on those projects.</p>
@@ -62,13 +62,13 @@ def render_portal(settings: Settings, ident: Optional[Identity], models: List[Di
         return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hayward · llm.apache.org</title>
+<title>llmao · llm.apache.org</title>
 {_STYLE}
 </head><body>
 <main class="shell">
   <div class="console">
     <div class="eyebrow">llm.apache.org</div>
-    <h1>Hayward</h1>
+    <h1>llmao</h1>
     <p class="lede">The ASF's governed gateway to language models. Sign in with your
     Apache identity to browse approved models and make metered calls billed to your project.</p>
     {signin}
@@ -94,12 +94,12 @@ def render_portal(settings: Settings, ident: Optional[Identity], models: List[Di
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hayward · llm.apache.org</title>
+<title>llmao · llm.apache.org</title>
 {_STYLE}
 </head><body>
 <main class="shell wide">
   <header class="topbar">
-    <div class="brand"><span class="mark"></span> hayward<span class="dim"> · llm.apache.org</span></div>
+    <div class="brand"><span class="mark"></span> llmao<span class="dim"> · llm.apache.org</span></div>
     <div class="who">
       <span class="uid">{_esc(ident.uid)}</span>
       <a class="ghost" href="/auth/logout">Sign out</a>
@@ -311,7 +311,7 @@ async function send(){
   btn.disabled=true; out.hidden=false; out.className='out'; out.textContent='…calling '+model;
   try{
     const r=await fetch('/v1/chat/completions',{
-      method:'POST', headers:{'Content-Type':'application/json','X-Hayward-Project':project},
+      method:'POST', headers:{'Content-Type':'application/json','X-LLMAO-Project':project},
       body:JSON.stringify({model, messages:[{role:'user',content:prompt}]}),
     });
     // Parse defensively: a timeout or crash can yield a non-JSON body.
@@ -329,7 +329,7 @@ async function send(){
       const u=j.usage;
       out.className='out';
       out.innerHTML = escapeHtml(j.choices[0].message.content) +
-        `<div class="usage">${u.total_tokens} tokens · $${(u.cost_usd||0).toFixed(4)} · billed to ${j.hayward_project}</div>`;
+        `<div class="usage">${u.total_tokens} tokens · $${(u.cost_usd||0).toFixed(4)} · billed to ${j.llmao_project}</div>`;
     }
   }catch(e){ out.className='out err'; out.textContent=String(e); }
   finally{ btn.disabled=false; refreshBudget(); }
