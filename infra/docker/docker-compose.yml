@@ -64,9 +64,6 @@ services:
       - LLMAO_SELFHOST_QWEN_CODER_URL=http://vllm-qwen-coder:8002/v1
       - LLMAO_SELFHOST_QWEN8B_URL=http://vllm-qwen8b:8003/v1
       - LLMAO_SELFHOST_API_KEY=${LLMAO_SELFHOST_API_KEY:-not-required}
-      # External providers.
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK}
       # Admin master key (team/key provisioning + spend).
       - LLMAO_LITELLM_MASTER_KEY=${LLMAO_LITELLM_MASTER_KEY}
     depends_on: [vllm-gemma, vllm-qwen-coder, vllm-qwen8b]

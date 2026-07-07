@@ -107,35 +107,6 @@ CATALOG: List[CatalogModel] = [
         api_base_env="LLMAO_SELFHOST_QWEN8B_URL",
         notes="Fast lightweight tier for routine/cheap calls.",
     ),
-
-    # --- external providers ---------------------------------------------
-    CatalogModel(
-        id="anthropic/claude-haiku",
-        display_name="Claude Haiku",
-        provider="anthropic",
-        backend="anthropic/claude-haiku-4-5",
-        context_window=200000,
-        license="proprietary",
-        openness="proprietary",
-        weights_distribution="n/a (API only)",
-        training_data_provenance="undisclosed (Anthropic)",
-        provenance_record="absent",
-        notes="External provider.",
-    ),
-    CatalogModel(
-        id="bedrock/claude-sonnet",
-        display_name="Claude Sonnet (Bedrock)",
-        provider="bedrock",
-        backend="bedrock/anthropic.claude-sonnet-4-5",
-        context_window=200000,
-        license="proprietary",
-        openness="proprietary",
-        weights_distribution="n/a (API only, via AWS Bedrock)",
-        training_data_provenance="undisclosed (Anthropic)",
-        provenance_record="absent",
-        notes="External provider via AWS Bedrock — the safer data layer for "
-              "sensitive content. Funds the security pipeline today.",
-    ),
 ]
 
 _BY_ID = {m.id: m for m in CATALOG}

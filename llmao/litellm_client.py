@@ -70,11 +70,13 @@ def _est_tokens(text: str) -> int:
 
 # Rough per-1k-token USD pricing so the budget math is non-trivial.
 _MOCK_PRICES = {
-    "openai/llama-3.1-8b-instruct": 0.0,      # self-hosted: no marginal API cost
-    "openai/mistral-7b-instruct": 0.0,
-    "openai/gpt-4o-mini": 0.0006,
-    "anthropic/claude-haiku-4-5": 0.0010,
-    "anthropic/claude-haiku": 0.0010,
+    # Self-hosted models have no per-token API bill, but GPU time isn't free.
+    # These nominal per-1k-token prices let budgets/metering exercise the
+    # self-host path (amortized GPU cost). Tune or zero per policy; the real
+    # cost model for self-host is decided by the advisor layer.
+    "selfhost/gemma4-26b": 0.0002,
+    "selfhost/qwen3.6-27b": 0.0002,
+    "selfhost/qwen3-8b": 0.0001,
 }
 
 
