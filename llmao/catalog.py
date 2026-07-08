@@ -64,7 +64,7 @@ CATALOG: List[CatalogModel] = [
         context_window=131072,
         license="Apache-2.0",
         openness="open-weight",
-        weights_distribution="google/gemma-4-26b-a4b (HF) \u00b7 vLLM",
+        weights_distribution="RedHatAI/gemma-4-26B-A4B-it-FP8-Dynamic (HF) \u00b7 vLLM",
         training_data_provenance="undisclosed (Google DeepMind)",
         provenance_record="absent",
         self_hosted=True,
@@ -72,25 +72,18 @@ CATALOG: List[CatalogModel] = [
         served_name="gemma4-26b",
         api_base_env="LLMAO_SELFHOST_GEMMA_URL",
         notes="MoE, ~4B active. General/multimodal/agentic default. "
-              "tau2-bench 85.5, LiveCodeBench v6 77.1 (vendor).",
+              "Pre-quantized FP8 checkpoint (~28GB VRAM); requires vLLM "
+              ">=0.19.1 and --enforce-eager. tau2-bench 85.5, LiveCodeBench "
+              "v6 77.1 (vendor).",
     ),
-    CatalogModel(
-        id="self-host/qwen3.6-27b",
-        display_name="Qwen 3.6 27B (self-hosted, coding)",
-        provider="self-host",
-        backend="selfhost/qwen3.6-27b",
-        context_window=131072,
-        license="Apache-2.0",
-        openness="open-weight",
-        weights_distribution="Qwen/Qwen3.6-27B (HF) \u00b7 vLLM",
-        training_data_provenance="undisclosed (Alibaba)",
-        provenance_record="absent",
-        self_hosted=True,
-        served_name="qwen3.6-27b",
-        api_base_env="LLMAO_SELFHOST_QWEN_CODER_URL",
-        notes="Best open dense coder in range. SWE-bench Verified 77.2, "
-              "ties Sonnet 4.6 on agentic index (vendor).",
-    ),
+    # --- ROTATION CANDIDATE (not currently resident) ---------------------
+    # Qwen 3.6 27B coder was dropped from the resident set: one L40S (44 GiB
+    # usable) cannot co-host Gemma-4-26B (~28GB) + a 27B coder + the 8B at
+    # once, even at FP8. To offer it, either (a) run it via vLLM sleep-mode
+    # rotation (few-second wake cost), or (b) provision a second GPU.
+    # Confirmed available as a pre-quantized checkpoint that loads on our
+    # engine: Qwen/Qwen3.6-27B-FP8 (HF), vLLM >=0.19.0. Re-add a CatalogModel
+    # entry here when a rotation or larger-GPU story is in place.
     CatalogModel(
         id="self-host/qwen3-8b",
         display_name="Qwen3 8B (self-hosted, fast)",
@@ -99,13 +92,15 @@ CATALOG: List[CatalogModel] = [
         context_window=131072,
         license="Apache-2.0",
         openness="open-weight",
-        weights_distribution="Qwen/Qwen3-8B (HF) \u00b7 vLLM",
+        weights_distribution="Qwen/Qwen3-8B-FP8 (HF) \u00b7 vLLM",
         training_data_provenance="undisclosed (Alibaba)",
         provenance_record="absent",
         self_hosted=True,
         served_name="qwen3-8b",
         api_base_env="LLMAO_SELFHOST_QWEN8B_URL",
-        notes="Fast lightweight tier for routine/cheap calls.",
+        notes="Fast lightweight tier for routine/cheap calls. Pre-quantized "
+              "FP8 (~8GB VRAM); loads on vLLM >=0.19.1 without --enforce-eager. "
+              "Reasoning model: set enable_thinking=false for fast/cheap use.",
     ),
 
 ]
