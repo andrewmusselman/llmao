@@ -68,7 +68,7 @@ services:
     #     -d '{"models":["selfhost/qwen3-8b","selfhost/gemma4-26b"],
     #          "key_alias":"gofannon-asvs"}'
     ports:
-      - "127.0.0.1:4000:4000"
+      - "100.105.28.100:4000:4000"
     command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
     volumes:
       - /etc/llmao/litellm-config.yaml:/etc/litellm/config.yaml:ro
