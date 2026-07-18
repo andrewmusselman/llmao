@@ -58,6 +58,17 @@ services:
     image: ghcr.io/berriai/litellm:main-stable
     restart: unless-stopped
     networks: [llmao-net]
+    # Loopback-only bind so the host Apache vhost can front it for
+    # machine-to-machine callers.
+    #
+    # Provision a per-caller virtual key rather than handing out the master
+    # key, so usage is attributable and revocable:
+    #   curl -X POST http://127.0.0.1:4000/key/generate \
+    #     -H "Authorization: Bearer $LLMAO_LITELLM_MASTER_KEY" \
+    #     -d '{"models":["selfhost/qwen3-8b","selfhost/gemma4-26b"],
+    #          "key_alias":"gofannon-asvs"}'
+    ports:
+      - "127.0.0.1:4000:4000"
     command: ["--config", "/etc/litellm/config.yaml", "--port", "4000"]
     volumes:
       - /etc/llmao/litellm-config.yaml:/etc/litellm/config.yaml:ro
