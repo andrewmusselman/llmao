@@ -7,11 +7,6 @@ model_list:
       model: openai/gemma4-26b
       api_base: os.environ/LLMAO_SELFHOST_GEMMA_URL
       api_key: os.environ/LLMAO_SELFHOST_API_KEY
-  - model_name: selfhost/qwen3-8b
-    litellm_params:
-      model: openai/qwen3-8b
-      api_base: os.environ/LLMAO_SELFHOST_QWEN8B_URL
-      api_key: os.environ/LLMAO_SELFHOST_API_KEY
 
 litellm_settings:
   drop_params: true

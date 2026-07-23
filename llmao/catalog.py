@@ -84,24 +84,30 @@ CATALOG: List[CatalogModel] = [
     # Confirmed available as a pre-quantized checkpoint that loads on our
     # engine: Qwen/Qwen3.6-27B-FP8 (HF), vLLM >=0.19.0. Re-add a CatalogModel
     # entry here when a rotation or larger-GPU story is in place.
-    CatalogModel(
-        id="self-host/qwen3-8b",
-        display_name="Qwen3 8B (self-hosted, fast)",
-        provider="self-host",
-        backend="selfhost/qwen3-8b",
-        context_window=131072,
-        license="Apache-2.0",
-        openness="open-weight",
-        weights_distribution="Qwen/Qwen3-8B-FP8 (HF) \u00b7 vLLM",
-        training_data_provenance="undisclosed (Alibaba)",
-        provenance_record="absent",
-        self_hosted=True,
-        served_name="qwen3-8b",
-        api_base_env="LLMAO_SELFHOST_QWEN8B_URL",
-        notes="Fast lightweight tier for routine/cheap calls. Pre-quantized "
-              "FP8 (~8GB VRAM); loads on vLLM >=0.19.1 without --enforce-eager. "
-              "Reasoning model: set enable_thinking=false for fast/cheap use.",
-    ),
+    # --- NOT SERVED (2026-07-23) -----------------------------------------
+    # Qwen3 8B was removed from the GPU: it was holding ~12GB of VRAM that
+    # nothing used, and forcing Gemma to run --enforce-eager at gpu-util 0.68.
+    # Gemma is now sole resident (0.90 util, 131072 context, CUDA graphs on).
+    # To restore, uncomment this AND re-add the vllm-qwen8b docker::run block
+    # in llmao.pp (plus the litellm require and LLMAO_SELFHOST_QWEN8B_URL env)
+    # -- and re-derive both models' --max-model-len for co-residency, since
+    # Gemma's current 131072 is a sole-resident number.
+    # CatalogModel(
+    #     id="self-host/qwen3-8b",
+    #     display_name="Qwen3 8B (self-hosted, fast)",
+    #     provider="self-host",
+    #     backend="selfhost/qwen3-8b",
+    #     context_window=8192,
+    #     license="Apache-2.0",
+    #     openness="open-weight",
+    #     weights_distribution="Qwen/Qwen3-8B-FP8 (HF) \u00b7 vLLM",
+    #     training_data_provenance="undisclosed (Alibaba)",
+    #     provenance_record="absent",
+    #     self_hosted=True,
+    #     served_name="qwen3-8b",
+    #     api_base_env="LLMAO_SELFHOST_QWEN8B_URL",
+    #     notes="Fast lightweight tier for routine/cheap calls.",
+    # ),
 
 ]
 
