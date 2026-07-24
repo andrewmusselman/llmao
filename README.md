@@ -34,6 +34,8 @@ make run            # serves http://127.0.0.1:8080
 
 `make` builds an isolated `.venv` so it works on Debian/Ubuntu's
 "externally managed" Python (PEP 668) without touching your system packages.
+It auto-detects a Python >= 3.10 on `PATH`; if yours lives elsewhere, pass it
+explicitly: `make install PYTHON=/path/to/python3.12`.
 If you'd rather manage the environment yourself:
 
 ```bash
