@@ -95,12 +95,12 @@ CATALOG: List[CatalogModel] = [
         # served_name is the invariant that keeps the proxy config, the
         # portal, and gofannon all agreeing.
         backend="qwen3-8b",
-        # 131072, not the 8192 this entry carried while Qwen shared the card
+        # 40960, not the 8192 this entry carried while Qwen shared the card
         # with Gemma. That was a CO-RESIDENCY number. Gemma is now served
         # off-host, so Qwen has the whole L40S and takes the full
         # architectural window. If Gemma ever comes back onto this card,
         # BOTH models' windows have to be re-derived.
-        context_window=131072,
+        context_window=40960,
         license="Apache-2.0",
         openness="open-weight",
         weights_distribution="Qwen/Qwen3-8B-FP8 (HF) \u00b7 vLLM",
