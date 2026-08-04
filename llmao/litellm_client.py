@@ -42,6 +42,11 @@ class Completion:
     prompt_tokens: int
     completion_tokens: int
     cost_usd: float
+    # Populated when the model reasoned. vLLM's reasoning parsers split the
+    # thinking block out of `content` into a separate field, so without this
+    # the portal shows an answer with no sign of the tokens spent producing
+    # it -- and at a low max_tokens, an EMPTY answer with no explanation.
+    reasoning: Optional[str] = None
 
 
 @dataclass
@@ -244,7 +249,12 @@ class ProxyBackend:
             raise BudgetExceeded(resp.text)
         resp.raise_for_status()
         body = resp.json()
-        choice = body["choices"][0]["message"]["content"]
+        message = body["choices"][0]["message"]
+        choice = message.get("content")
+        # vLLM emits `reasoning`; litellm normalises it to `reasoning_content`.
+        # Accept either -- which one arrives depends on the proxy version, and
+        # a silent None here looks identical to "the model didn't think".
+        reasoning = message.get("reasoning_content") or message.get("reasoning")
         usage = body.get("usage", {})
         cost = float(body.get("_hidden_params", {}).get("response_cost") or 0.0)
 
@@ -259,6 +269,7 @@ class ProxyBackend:
         return Completion(
             choice, model_backend,
             usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), cost,
+            reasoning=reasoning,
         )
 
     def usage(self, project: Optional[str]) -> List[Dict]:

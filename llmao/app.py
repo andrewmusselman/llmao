@@ -147,6 +147,20 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
         params = {k: v for k, v in body.items() if k in ("temperature", "top_p", "max_tokens", "stream")}
         params.pop("stream", None)  # Phase 1 returns non-streamed; streaming is a later toggle.
 
+        # Extended thinking. Sent as vLLM's chat-template kwarg rather than a
+        # sampling parameter, so it needs its own path -- the whitelist above
+        # is deliberately narrow and would drop it.
+        #
+        # Only forwarded when the model declares supports_thinking, and only
+        # when the caller was explicit: passing the kwarg at all overrides the
+        # model's own default, and those defaults differ (gemma4 off, qwen3
+        # on). Omitting it leaves each model's native behaviour intact.
+        think = body.get("thinking")
+        if think is not None:
+            model = catalog.get(model_id)
+            if model is not None and getattr(model, "supports_thinking", False):
+                params["chat_template_kwargs"] = {"enable_thinking": bool(think)}
+
         try:
             completion = seam.chat(ident, project, model_id, messages, params)
         except AuthzError as e:
@@ -166,7 +180,14 @@ def create_app(settings: Optional[Settings] = None) -> Quart:
             "llmao_project": project,
             "choices": [{
                 "index": 0,
-                "message": {"role": "assistant", "content": completion.content},
+                "message": {
+                    "role": "assistant",
+                    "content": completion.content,
+                    # Present only when the model reasoned. Rendered collapsed
+                    # in the portal -- diagnostic, not part of the answer.
+                    **({"reasoning_content": completion.reasoning}
+                       if getattr(completion, "reasoning", None) else {}),
+                },
                 "finish_reason": "stop",
             }],
             "usage": {

@@ -123,6 +123,15 @@ def render_portal(settings: Settings, ident: Optional[Identity], models: List[Di
           <textarea id="prompt" rows="6" placeholder="Ask something, or attach a file below."></textarea>
         </label>
         <div class="row2">
+          <label>Temperature <span class="hint" id="temp-val">0.6</span>
+            <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.6">
+          </label>
+          <label class="think" id="think-wrap">
+            <input type="checkbox" id="thinking"> Extended thinking
+            <span class="hint" id="think-hint"></span>
+          </label>
+        </div>
+        <div class="row2">
           <label class="file">Attach a file <span class="hint">text · md · code · ≤2&nbsp;MB</span>
             <input type="file" id="file" accept=".txt,.md,.json,.py,.java,.go,.yaml,.yml,.csv,.log">
           </label>
@@ -223,6 +232,13 @@ textarea{resize:vertical;line-height:1.5;}
 .bar>span{display:block;height:100%;background:var(--accent);}
 .bar.warn>span{background:var(--warn);}
 .bar.bad>span{background:var(--bad);}
+.think{display:flex;align-items:center;gap:8px;font-size:13px;}
+.think input{width:auto;margin:0;}
+input[type=range]{width:100%;accent-color:var(--accent, #5b9dd9);}
+.reasoning{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;}
+.reasoning summary{cursor:pointer;color:var(--faint);font-size:12px;user-select:none;}
+.reasoning pre{white-space:pre-wrap;color:var(--dim);font-size:12px;
+  font-family:var(--mono);margin:8px 0 0;}
 .activity{font-family:var(--mono);font-size:12px;color:var(--dim);}
 .activity table{width:100%;border-collapse:collapse;margin-top:8px;}
 .activity th{text-align:left;color:var(--faint);font-weight:500;border-bottom:1px solid var(--line);
@@ -244,6 +260,7 @@ function fillModels(){
 function showMeta(){
   const m = CTX.models.find(x => x.id === modelSel.value);
   if(!m){ $('modelmeta').textContent=''; return; }
+  syncThinking(m);
   const openCls = m.openness === 'open-weight' || m.openness === 'open-source' ? 'lic' : 'prop';
   $('modelmeta').innerHTML =
     `<b>license</b> <span class="${openCls}">${m.license}</span> · <b>openness</b> ${m.openness}<br>`+
@@ -297,6 +314,23 @@ async function readFile(file){
   });
 }
 
+// The thinking toggle reflects each model's OWN default, because they
+// differ: gemma4 does not reason unless asked, qwen3 reasons unless told
+// not to. Showing one fixed default would misrepresent one of them, and a
+// user who never touches the box would get behaviour they did not choose.
+function syncThinking(m){
+  const wrap=$('think-wrap'), box=$('thinking'), hint=$('think-hint');
+  if(!m.supports_thinking){
+    wrap.style.display='none';
+    box.checked=false;
+    return;
+  }
+  wrap.style.display='flex';
+  box.checked = !!m.thinks_by_default;
+  hint.textContent = m.thinks_by_default ? '(on by default for this model)'
+                                         : '(off by default for this model)';
+}
+
 async function send(){
   const btn=$('send'), out=$('out');
   const project=projectSel.value, model=modelSel.value;
@@ -312,7 +346,13 @@ async function send(){
   try{
     const r=await fetch('/v1/chat/completions',{
       method:'POST', headers:{'Content-Type':'application/json','X-LLMAO-Project':project},
-      body:JSON.stringify({model, messages:[{role:'user',content:prompt}]}),
+      body:JSON.stringify({
+        model, messages:[{role:'user',content:prompt}],
+        temperature: parseFloat($('temperature').value),
+        // Always sent when the model supports it, so the checkbox is
+        // authoritative rather than only overriding in one direction.
+        ...($('think-wrap').style.display==='none' ? {} : {thinking: $('thinking').checked}),
+      }),
     });
     // Parse defensively: a timeout or crash can yield a non-JSON body.
     let j=null;
@@ -328,7 +368,15 @@ async function send(){
     else{
       const u=j.usage;
       out.className='out';
-      out.innerHTML = escapeHtml(j.choices[0].message.content) +
+      const msg = j.choices[0].message;
+      // Collapsed by default -- the reasoning is diagnostic, not something
+      // anyone reads by choice. It is here so a surprising answer can be
+      // traced, not to be part of the normal reading flow.
+      const think = msg.reasoning_content
+        ? `<details class="reasoning"><summary>Thinking</summary>`
+          + `<pre>${escapeHtml(msg.reasoning_content)}</pre></details>`
+        : '';
+      out.innerHTML = escapeHtml(msg.content || '') + think +
         `<div class="usage">${u.total_tokens} tokens · $${(u.cost_usd||0).toFixed(4)} · billed to ${j.llmao_project}</div>`;
     }
   }catch(e){ out.className='out err'; out.textContent=String(e); }
@@ -336,6 +384,7 @@ async function send(){
 }
 function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
+$('temperature').addEventListener('input', e => { $('temp-val').textContent = e.target.value; });
 modelSel.addEventListener('change', showMeta);
 projectSel.addEventListener('change', refreshBudget);
 $('send').addEventListener('click', send);

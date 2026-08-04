@@ -43,6 +43,20 @@ class CatalogModel:
     served_name: Optional[str] = None    # vLLM --served-model-name
     api_base_env: Optional[str] = None   # env var holding this model's vLLM URL
 
+    # --- thinking / extended reasoning -----------------------------------
+    # supports_thinking: the served model runs a reasoning parser, so the
+    #   enable_thinking chat-template kwarg is meaningful. False hides the
+    #   toggle in the portal and the kwarg is never sent.
+    #
+    # thinks_by_default: what the model does with NO kwarg. Differs per model
+    #   and is not guessable -- measured 2026-08-04 through the proxy:
+    #     qwen3-8b   with no kwarg -> 893 chars of reasoning  (True)
+    #     gemma4-26b with no kwarg -> 0 chars                 (False)
+    #   Gemma reasons only when asked; Qwen reasons unless told not to. A
+    #   single global default would be wrong for one of them.
+    supports_thinking: bool = False
+    thinks_by_default: bool = False
+
     def public(self) -> Dict:
         d = asdict(self)
         # Serving details are operational, not part of the public catalog.
@@ -81,6 +95,8 @@ CATALOG: List[CatalogModel] = [
         modality="text+vision",
         served_name="gemma4-26b",
         api_base_env="LLMAO_SELFHOST_GEMMA_URL",
+        supports_thinking=True,
+        thinks_by_default=False,   # --reasoning-parser gemma4 leaves it off
         notes="MoE, ~4B active. General/multimodal/agentic default. "
               "Served off-host at BF16 on an 80GB card (~49GB weights, "
               "131072 window, ~856k-token KV cache). Measured ~100 tok/s "
@@ -109,6 +125,8 @@ CATALOG: List[CatalogModel] = [
         self_hosted=True,
         served_name="qwen3-8b",
         api_base_env="LLMAO_SELFHOST_QWEN8B_URL",
+        supports_thinking=True,
+        thinks_by_default=True,    # reasons unless enable_thinking=false
         notes="Fast lightweight tier for routine/cheap calls. Sole resident "
               "on the local L40S at FP8 (~8GB weights). Reasoning model: "
               "vLLM runs --reasoning-parser qwen3, and unlike Gemma the "
